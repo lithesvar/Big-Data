@@ -1,0 +1,70 @@
+import org.apache.log4j.Level
+import org.apache.log4j.Logger
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.SaveMode
+
+object project1 extends App{
+  
+  Logger.getLogger("org").setLevel(Level.ERROR)
+  
+  //spark Configuration 
+  val conf = new SparkConf()
+  conf.set("spark.app.name"," my first application")
+  conf.set("spark.master","local[2]")
+  
+  //Creating SparkSession
+  val spark = SparkSession.builder()
+  .config(conf)
+  .getOrCreate()
+  
+  //Reading a file
+  val file1 = spark.read
+  .format("csv")
+  .option("header", true)
+  .option("inferSchema", true)
+  .option("path", "D:\\Share folder\\final_project\\us_states.csv")
+  .load()
+  
+    val file2 = spark.read
+  .format("csv")
+  .option("header", true)
+  .option("inferSchema", true)
+  .option("path", "D:\\Share folder\\final_project\\us_county.csv")
+  .load()
+  
+
+   file1.createOrReplaceTempView("stateTable")
+   
+   file2.createOrReplaceTempView("countryTable")
+   
+   //Finding no.of.cases and deaths in state
+   val state_result = spark.sql("""select state, sum(cases) as totalCases, sum(deaths) as totalDeaths from stateTable
+                          group by state""")
+                          
+   //Finding no.of.cases and deaths in country
+   val country_result = spark.sql("""select county1, state, sum(cases1) as totalCases, sum(deaths1) as totalDeaths from countryTable
+                          group by county1, state""")
+   
+   //joining both country and state table
+   val newDf = file2.join(file1, file2.col("state") === file1.col("state") , "outer").drop(file1.col("state"))
+   newDf.createOrReplaceTempView("countryState")
+   
+   //Finding no.of.cases and deaths in both country and state
+   val finalResult = spark.sql("""select county1, state, sum(cases1) as totalCountryCases, sum(deaths1) as totalCountrydeaths from countryState
+         group by county1, state""")
+
+   printf("processing")
+   
+   finalResult.write
+   .format("csv")
+   .mode(SaveMode.Overwrite)
+   .option("path","D:\\Project\\output\\")
+   .save()
+  
+   printf("completed")
+  
+}
